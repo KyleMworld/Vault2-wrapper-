@@ -2,6 +2,8 @@
 
 **Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
 
+A small change so that this project can be submitted in Pull Request Format. 
+ 
 Foundry consists of:
 
 - **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
