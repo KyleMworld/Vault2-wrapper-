@@ -2,28 +2,20 @@
 pragma solidity ^0.8.18;
 
 import {Test} from "forge-std/Test.sol";
-import {JediVault} from "../src/JediVault.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {JediVault, JediToken} from "../src/JediVault.sol";
 
-contract SithToken is ERC20 {
-    constructor() ERC20("Sith Token", "SITH") {
-        _mint(msg.sender, 1000 ether);
-    }
-}
 
 contract JediVaultTest is Test {
     JediVault public vault;
-    SithToken public asset;
+    JediToken public asset;
     address public user = makeAddr("user");
-    using SafeERC20 for SithToken;
 
     function setUp() public {
-        asset = new SithToken();
+        asset = new JediToken(1000 ether);
         vault = new JediVault(address(asset));
 
         // Distribute some SITH tokens to the user
-        asset.safeTransfer(user, 100 ether);
+        require(asset.transfer(user, 100 ether), "Transfer failed");
     }
 
     function testDeposit() public {
@@ -49,5 +41,49 @@ contract JediVaultTest is Test {
 
         assertEq(vault.balanceOf(user), 0 ether);
         assertEq(asset.balanceOf(user), 100 ether);
+    }
+
+    function testDepositMultipleUsers() public {
+        address user2 = makeAddr("user2");
+        require(asset.transfer(user2, 100 ether), "Transfer failed");
+
+        uint256 amount1 = 30 ether;
+        uint256 amount2 = 70 ether;
+
+        vm.startPrank(user);
+        asset.approve(address(vault), amount1);
+        vault.deposit(amount1);
+        vm.stopPrank();
+
+        vm.startPrank(user2);
+        asset.approve(address(vault), amount2);
+        vault.deposit(amount2);
+        vm.stopPrank();
+
+        assertEq(vault.balanceOf(user), amount1);
+        assertEq(vault.balanceOf(user2), amount2);
+        assertEq(asset.balanceOf(address(vault)), amount1 + amount2);
+    }
+
+    function testReverWhen_WithdrawExceedsBalance() public {
+        uint256 depositAmount = 50 ether;
+        uint256 withdrawAmount = 60 ether;
+
+        vm.startPrank(user);
+        asset.approve(address(vault), depositAmount);
+        vault.deposit(depositAmount);
+
+        vm.expectRevert("Burn amount exceeds balance");
+        vault.withdraw(withdrawAmount);
+        vm.stopPrank();
+    }
+
+    function testRevertWhen_DepositZeroAmount() public {
+        vm.startPrank(user);
+        asset.approve(address(vault), 0);
+
+        vm.expectRevert("Amount must be greater than zero");
+        vault.deposit(0);
+        vm.stopPrank();
     }
 }
